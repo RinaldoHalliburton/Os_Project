@@ -20,8 +20,10 @@ class Process:
    
     def get_next_instruction(self):
         """Get the next instruction, or None if done."""
-        if self.current_instruction <= len(self.instructions):
+        if self.current_instruction < len(self.instructions):
+            print("Current Instruction:", self.instructions, "Current Instruction Number:", self.current_instruction)
             return self.instructions[self.current_instruction]
+            
         else:
             self.state = 'TERMINATED'
             return None
@@ -44,7 +46,7 @@ class Process:
 
             cputicks()
 
-            return (1,"OUTPUT")  # Returns CPU ticks used
+            return (1,"INPUT")  # Returns CPU ticks used
         elif instruction == 'OUTPUT':
             self.cpu_time += 1  # OUTPUT takes 1 tick, then waits
             self.current_instruction += 1
@@ -52,9 +54,8 @@ class Process:
 
             cputicks()
 
-            return (1,"INPUT")  # Returns CPU ticks used
-        return 0  # No instruction (TERMINATED)
-
+            return (1,"OUTPUT")  # Returns CPU ticks used
+        return (1,"TERMINATED")  # Returns CPU ticks used
 class MemoryManager:
     def __init__(self, os_memory_reserved, user_memory, allocation_strategy='first_fit', max_processes=10):
         self.os_memory_reserved = os_memory_reserved  # Memory reserved for the OS
@@ -68,9 +69,7 @@ class MemoryManager:
     
     def allocate_memory(self, process):
         """Allocates memory to a process."""
-        print("\n")
-        print(len(self.allocated_memory))
-        print(self.allocation_strategy)
+        
         if len(self.allocated_memory)  >= self.max_processes:
             print(f"Process {process.pid} failed to allocate memory. Maximum number of processes reached.")
             return False
@@ -80,8 +79,7 @@ class MemoryManager:
             if self.allocation_strategy == 'first_fit':
                 for i, (start, block_size) in enumerate(self.free_blocks):
                     if size <= block_size:
-                        print("block_size " + str(block_size))
-                        print("size " + str(size))
+                        
                         self.allocated_memory[process.pid] = (start, size)
                         print(f"Process {process.pid} allocated {size} units of memory and starts at {start}.")
                         print(self.allocated_memory)
@@ -93,28 +91,7 @@ class MemoryManager:
                         return True
                 print(f"Process {process.pid} failed to allocate {size} units of memory.")
                 return False
-            # elif self.allocation_strategy == 'best_fit':
-            #     if len(self.allocated_memory) >= self.max_processes:
-            #         print(f"Process {process.pid} failed to allocate memory. Maximum number of processes reached.")
-            #         return False
-
-            #     size = process.memory_required
-            #     best_fit = None
-            #     for i, (start, block_size) in enumerate(self.free_blocks):
-            #         if size <= block_size and (best_fit is None or block_size < best_fit[1]):
-            #             best_fit = (i, start, block_size)
-            #     if best_fit is not None:
-            #         i, start, block_size = best_fit
-            #         self.allocated_memory[process.pid] = (start, size)
-            #         if size == block_size:
-            #             self.free_blocks.pop(i)
-            #         else:
-            #             self.free_blocks[i] = (start + size, block_size - size)
-            #         print(f"Process {process.pid} allocated {size} units of memory.")
-            #         return True
-            #     print(f"Process {process.pid} failed to allocate {size} units of memory.")
-            #     return False
-
+            
     def release_memory(self, process):
         """Releases memory for a terminated process."""
         if process.pid in self.allocated_memory:
@@ -145,57 +122,58 @@ class RoundRobinScheduler:
         total_ticks_used = 0
         waiting_processes = []
 
-        # while self.waiting_processes[1] or self.waiting_processes[2]:
-        #     for process, event_time in self.waiting_processes[1]:
-        #         if event_time <= cpu_ticks:
-        #             self.event_manager.trigger_event(event_number)
-        #             self.waiting_processes[1].remove((process, event_time))
-        #     for process, event_time in self.waiting_processes[2]:
-        #         if event_time <= cpu_ticks:
-        #             self.event_manager.trigger_event(event_number)
-        #             self.waiting_processes[2].remove((process, event_time))
+       
         
-        while self.ready_queue and total_ticks_used < ticks_to_run:
+        while self.ready_queue and total_ticks_used < ticks_to_run and ticks_to_run > self.context_switch:
             current_process = self.ready_queue.pop(0)
+            for i in range(self.context_switch):
+                cputicks()
+                total_ticks_used += 1
             print(f"\nScheduling Process {current_process.pid}")
             time_slice = 0
-            while time_slice <= self.quantum and current_process.state == 'READY':
+            while time_slice < self.quantum and current_process.state == 'READY':
 
-                current_process
                 ticks_used = current_process.execute_instruction()
                 time_slice += ticks_used[0]
                 total_ticks_used += ticks_used[0]
+                print(f"Process {current_process.pid} used {ticks_used[0]} tick(s).")
 
-               
+                event = 0
                 if current_process.state == 'WAITING':
                     print(f"Process {current_process.pid} is waiting.")
                     if ticks_used[1] == 'INPUT':
-                     
-                        waiting_processes.append([0,current_process, cputicks(0) + 8])
+                        event = cputicks(0) + 3
+                        waiting_processes.append([1,current_process, event])
+                  
+
 
                     if ticks_used[1] == 'OUTPUT':
+                        event = cputicks(0) + 4
+                        waiting_processes.append([2,current_process, event]) 
                 
-                        waiting_processes.append([1,current_process, cputicks(0) + 5])   
-                    break
+
+                    return (total_ticks_used, waiting_processes)
                 
                 if current_process.state == 'TERMINATED':
                     print(f"Process {current_process.pid} terminated.")
+                  
                     break
 
                 if total_ticks_used >= ticks_to_run:  # Stop if tick limit is reached
                     break
 
             if current_process.state == 'READY':
-                for i in range(self.context_switch):
-                    cputicks()
+                print("Ticks used:", total_ticks_used)
+                print("CPU ticks:", cputicks(0))
+              
                 self.ready_queue.append(current_process)  # Re-add to queue if not done
 
         return (total_ticks_used, waiting_processes)
 
 class EventManager:
     def __init__(self):
-        # self.waiting_processes = {1: [], 2: []}  # Processes waiting for INPUT (1) or OUTPUT (2)
-        self.waiting_processes = [[],[]]
+        self.waiting_processes = {1: [], 2: []}  # Processes waiting for INPUT (1) or OUTPUT (2)
+        # self.waiting_processes = [[],[]]
         self.event_number = 0
         self.event_triggered = False
     
@@ -203,38 +181,35 @@ class EventManager:
 
     def wait_for_event(self, process, event_number):
         self.waiting_processes[event_number].append(process)
-        print(f"Process {process.pid} is waiting for event {event_number}")
 
-    def check_events(self):
-        """Check if any processes are waiting for an event."""
-        for processes in self.waiting_processes:
-            for process in processes:
-                if process[0] >= cputicks(0):
-                    self.trigger_event(event_number)
-                    print(f"Event {event_number} is pending.")
-                    self.event_triggered = True
-                    self.event_number = event_number
-            self.event_triggered = False
+
+        print(f"Process {process.pid} is waiting for event {event_number}")
+        print(self.waiting_processes)
+
+   
+
+    
 
     def trigger_event(self, event_number):
         """Triggers the event, allowing waiting processes to resume."""
         if event_number == 1:
             self.waiting_processes[event_number][0].state = 'READY'
             process = self.waiting_processes[event_number][0]
-            self.waiting_processes[event_number].pop(0)
-            self.scheduler.add_process(process)
-
+            event_complete = self.waiting_processes[event_number].pop(0)
             print(f"Event {event_number} triggered. Process {process.pid} is now ready.")
+      
+            return event_complete
+
          
             
         if event_number == 2:
             self.waiting_processes[event_number][0].state = 'READY'
             process = self.waiting_processes[event_number][0]
-            self.waiting_processes[event_number].pop(0)
-            self.scheduler.add_process(process)
-
-
+            event_complete = self.waiting_processes[event_number].pop(0)
             print(f"Event {event_number} triggered. Process {process.pid} is now ready.")
+          
+            return event_complete
+            
 
 class Simulator:
     def __init__(self, quantum, reserved_memory, user_memory, max_processes, mem_alloc, context_switch):
@@ -243,63 +218,29 @@ class Simulator:
         self.event_manager = EventManager()
         self.context_switch = context_switch
         self.total_process_size = 0
+        self.residual_ticks = 0
+        self.all_processes = []
 
     def add_process(self, pid, instructions, memory_required):
         """Add a process to the simulation."""
         process = Process(pid, instructions, memory_required)
         if self.memory_manager.allocate_memory(process):
             self.scheduler.add_process(process)
+            self.all_processes.append(process)
             self.total_process_size += memory_required
     
-    # def remove_process(self, process):
-    #     """Remove a process from the simulation."""
-    #     self.scheduler.remove_process(process)
-    #     self.memory_manager.release_memory(process)
 
-    # def show_stats(self):
-    #     """Display current stats about the processes and memory."""
-    #     active_processes = sum(1 for p in self.scheduler.ready_queue if p.state == 'READY')
-    #     waiting_processes = sum(1 for p in self.scheduler.ready_queue if p.state == 'WAITING')
-    #     terminated_processes = sum(1 for p in self.scheduler.ready_queue if p.state == 'TERMINATED')
-    #     total_processes = len(self.scheduler.ready_queue)
-        
-    #     print("\n--- SYSTEM STATS ---")
-    #     print(f"Total Processes: {total_processes}")
-    #     print(f"Active (READY) Processes: {active_processes}")
-    #     print(f"Waiting Processes: {waiting_processes}")
-    #     print(f"Terminated Processes: {terminated_processes}")
-
-    # def user_input_pause(self):
-    #     """Pause the simulation and wait for user input to continue or stop."""
-    #     choice = input("\nPick from OPTIONS \nShow Jobs \nShow Queues \nShow Memory").strip().lower()
-    #     match choice:
-    #         case 'show jobs':
-    #             print("\n--- JOBS ---")
-    #             for process in self.scheduler.ready_queue:
-    #                 print(f"Process {process.pid}: {process.state}")
-    #         case 'show queues':
-    #             print("\n--- QUEUES ---")
-    #             print("Ready Queue:", [p.pid for p in self.scheduler.ready_queue if p.state == 'READY'])
-    #             print("Waiting Queue:", [p.pid for p in self.scheduler.ready_queue if p.state == 'WAITING'])
-    #         case 'show memory':
-    #             print("\n--- MEMORY ---")
-    #             print("Free Blocks:", self.memory_manager.free_blocks)
-    #             print("Allocated Memory:", self.memory_manager.allocated_memory)
-    #         case _:
-    #             print("Invalid choice. Please enter a valid option.")
-    #     return choice == 'yes'  # Return True if user wants to continue
-
-    def get_ticks_from_user(self):
+    def get_ticks_from_user(self, tickr = 0):
         """Ask the user for the number of ticks to run the simulation."""
         while True:
             try:
                 ticks = int(input("\nEnter the number of ticks to run the simulation (must be greater than 5): "))
-                while ticks < 5:
-                    print("Please enter a number greater than 5.")
+                while ticks < 1 + self.context_switch:
+                    print("Please enter a number greater than the context switch time (5).")
                     ticks = int(input("\nEnter the number of ticks to run the simulation: "))
 
 
-                return ticks
+                return ticks + tickr
             except ValueError:
                 print("Invalid input. Please enter a valid number of ticks.")
 
@@ -307,27 +248,73 @@ class Simulator:
         """Run the simulator."""
 
         continue_simulation = True
-        while continue_simulation:
-            ticks_to_run = self.get_ticks_from_user()  # Get how many ticks to run
+        wait_processes = []
+        event_occured = 0
+
+        while continue_simulation and self.scheduler.ready_queue:
+            ticks_to_run = self.get_ticks_from_user(self.residual_ticks)
+            #ticks_to_run = 6
+            self.residual_ticks = 0
+            used_ticks = 0
             total_ticks = 0
 
             global cpu_ticks
-            while total_ticks <= ticks_to_run:
-                    processing = self.scheduler.schedule_for_ticks(ticks_to_run - total_ticks)
-                    used_ticks = processing[0]
-                    wait_processes = processing[1]
+            while total_ticks < ticks_to_run:
 
+                    
+
+                    print("Waiting Processes:", wait_processes)
+
+                    # Wait Processes = [event_number, process, event_time]
                     if wait_processes:
                         for i in range(len(wait_processes)):
-                          
-                            self.event_manager.waiting_processes[wait_processes[i][0]].append([wait_processes[i][2], wait_processes[i][1]])
-                           
-                   
-                    self.event_manager.check_events()
-                    
-                    total_ticks += used_ticks
-                    if used_ticks == 0:  # If no more ticks are being used (all processes done)
+                            if wait_processes[i][1] not in self.event_manager.waiting_processes[wait_processes[i][0]]:
+                                self.event_manager.wait_for_event(wait_processes[i][1], wait_processes[i][0])
+                                # self.memory_manager.release_memory(wait_processes[i][1])
+                                # self.memory_manager.add_process(wait_processes[i][1])
+
+                            while wait_processes[i][2] > cpu_ticks and total_ticks < ticks_to_run:
+                                cputicks()
+                                total_ticks += 1
+                                
+                            print(" total ticks:", total_ticks)
+                            if wait_processes[i][2] == cpu_ticks:
+                                event_occured = self.event_manager.trigger_event(wait_processes[i][0])
+                                self.scheduler.add_process(event_occured)
+                                print("CPU ticks:", cputicks(0))
+                                print("Event time:", wait_processes[i][2])
+                                wait_processes.pop(i)
+                                print("Waiting Processes:", wait_processes)
+                                for i in  range(len(self.scheduler.ready_queue)):
+                                    print(f"Process {self.scheduler.ready_queue[i].pid} is in the ready queue.")
+
+                    if ticks_to_run - total_ticks < self.context_switch:
+                        print("Ticks that remain:", ticks_to_run - total_ticks, "is less than the context switch time.")
+                        print("\n You may add more ticks to run the simulation.")
+                        self.residual_ticks = ticks_to_run - total_ticks
                         break
+                           
+                    if total_ticks <= ticks_to_run:
+                        print(f"\nRunning simulation for {ticks_to_run - total_ticks} ticks.")
+                        processing = self.scheduler.schedule_for_ticks(ticks_to_run - total_ticks)
+                        used_ticks = processing[0]
+                        print("Used ticks:", used_ticks)
+                        if processing[1]:
+                            wait_processes.append(processing[1][0])
+                        total_ticks += used_ticks
+                        print("Total ticks used:", total_ticks)
+                        
+                        if used_ticks == 0:  # If no more ticks are being used (all processes done)
+                            break
+
+        print("\nSimulation complete.")
+        print("Total CPU ticks:", cputicks(0))
+        print("Total ticks used:", total_ticks)
+        print("Total process size:", self.total_process_size)
+        for i in range(len(self.all_processes)):
+            print(f"Process {self.all_processes[i].pid} has a state of {self.all_processes[i].state}.")
+
+        exit()
 
         self.scheduler.schedule()
         # Release memory for all terminated processes
