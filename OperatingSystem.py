@@ -81,13 +81,13 @@ class MemoryManager:
                     if size <= block_size:
                         
                         self.allocated_memory[process.pid] = (start, size)
-                        print(f"Process {process.pid} allocated {size} units of memory and starts at {start}.")
-                        print(self.allocated_memory)
+                        #print(f"Process {process.pid} allocated {size} units of memory and starts at {start}.")
+                        #print(self.allocated_memory)
                         if size == block_size:
                             self.free_blocks.pop(i)
                         else:
                             self.free_blocks[i] = (start + size, block_size - size)
-                        print(f"Process {process.pid} allocated {size} units of memory.")
+                        #print(f"Process {process.pid} allocated {size} units of memory.")
                         return True
                 print(f"Process {process.pid} failed to allocate {size} units of memory.")
                 return False
@@ -227,6 +227,9 @@ class Simulator:
     def show_jobs(self):
         for process in self.all_processes:
             print(f"Process {process.pid}: Status = {process.state}") 
+    def show_memory(self):
+        print(self.memory_manager.allocate_memory)
+    
 
     def add_process(self, pid, instructions, memory_required):
         """Add a process to the simulation."""
@@ -320,6 +323,7 @@ class Simulator:
             print(f"Process {self.all_processes[i].pid} has a state of {self.all_processes[i].state}.")
 
         exit()
+        #get_simulator_cmd(self)
 
         self.scheduler.schedule()
         # Release memory for all terminated processes
@@ -396,26 +400,28 @@ def get_setup_input():
    
     return x, s, u, n,mem_alloc, context_switch
 
-def get_simulator_cmd(simulator):
+def getandRun_simulator_cmd(simulator):
     cmd = input("Enter Simulator command: ")
-    match cmd:
-        case "show jobs":
-            simulator.show_jobs()
-            get_simulator_cmd(simulator)
-        case "tick n":
-            cmd.split()
-            n = int(cmd[1]) #run tick for n times IMPLEMENT THAT
-            simulator.run()
-        case "stop":
-            pass
-        case "show queues":
-            pass
-        case "show memory":
-            pass
-        case "admit":
-            pass
-        case "inerrupt":
-            pass
+    if cmd == "show jobs":
+        simulator.show_jobs()
+        getandRun_simulator_cmd(simulator)
+    if "tick" in cmd:
+        cmd = cmd.split()
+        n = int(cmd[1])
+        simulator.run() #run for n ticks
+    if cmd == "stop":
+        pass
+    if cmd == "show queues":
+        pass
+    if cmd == "show memory":
+        print(simulator.memory_manager.allocated_memory)  #dont include the first item
+        getandRun_simulator_cmd(simulator)
+    if cmd == "admit":
+        pass
+    if cmd == "interrupt":
+        pass
+    
+
 
 def main():
     x, s, u, n,mem_alloc, context_switch = get_setup_input()
@@ -430,7 +436,8 @@ def main():
     simulator.add_process(6, ["COMPUTE", "COMPUTE", "COMPUTE"], 64)
     simulator.add_process(7, ["COMPUTE", "COMPUTE", "COMPUTE"], 128)
 
-    get_simulator_cmd(simulator)
+    getandRun_simulator_cmd(simulator)
+    #simulator.run()
 
 
 if __name__ == "__main__":
