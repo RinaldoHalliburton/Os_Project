@@ -101,19 +101,22 @@ class MemoryManager:
             print(f"Process {process.pid} released {size} units of memory.")
 
 class RoundRobinScheduler:
-    def __init__(self, quantum, context_switch=1):
+    def __init__(self, max_processes,quantum, context_switch=1):
         self.quantum = quantum  # Time slice for each process
         self.ready_queue = []   # Queue of processes ready to run
         self.event_manager = EventManager()
         self.context_switch = context_switch
         # self.waiting_processes = {1: [], 2: []}  # Processes waiting for INPUT (1) or OUTPUT (2)
         self.waiting_processes = ()
+        self.max_processes = max_processes
        
 
 
     def add_process(self, process):
         """Add a process to the ready queue."""
         self.ready_queue.append(process)
+        
+        
 
     
 
@@ -213,13 +216,17 @@ class EventManager:
 
 class Simulator:
     def __init__(self, quantum, reserved_memory, user_memory, max_processes, mem_alloc, context_switch):
-        self.scheduler = RoundRobinScheduler(quantum, context_switch)
+        self.scheduler = RoundRobinScheduler(max_processes,quantum, context_switch)
         self.memory_manager = MemoryManager(reserved_memory, user_memory, mem_alloc, max_processes)
         self.event_manager = EventManager()
         self.context_switch = context_switch
         self.total_process_size = 0
         self.residual_ticks = 0
         self.all_processes = []
+
+    def show_jobs(self):
+        for process in self.all_processes:
+            print(f"Process {process.pid}: Status = {process.state}") 
 
     def add_process(self, pid, instructions, memory_required):
         """Add a process to the simulation."""
@@ -236,7 +243,7 @@ class Simulator:
             try:
                 ticks = int(input("\nEnter the number of ticks to run the simulation (must be greater than 5): "))
                 while ticks < 1 + self.context_switch:
-                    print("Please enter a number greater than the context switch time (5).")
+                    print(f"Please enter a number greater than the context switch time {self.context_switch}.")
                     ticks = int(input("\nEnter the number of ticks to run the simulation: "))
 
 
@@ -260,8 +267,6 @@ class Simulator:
 
             global cpu_ticks
             while total_ticks < ticks_to_run:
-
-                    
 
                     print("Waiting Processes:", wait_processes)
 
@@ -323,12 +328,7 @@ class Simulator:
                 self.memory_manager.release_memory(process)
 
 
-
-
-def main():
-
-   
-
+def get_setup_input():
     while True:
         try:
             s = int(input("Enter the amount of RAM reserved for the OS  (For example 128): "))
@@ -372,15 +372,13 @@ def main():
 
     while True:
         try:
-            x = int(input("Enter the number of ticks (For example 5): "))
+            x = int(input("Enter the quantum (For example 40): "))
             if x < 1:
-                print("Please enter a valid number of ticks (at least 1).")
+                print("Please enter a valid quantum (at least 1).")
                 continue
             break
         except ValueError:
             print("Invalid input. Please enter a valid integer.")
-
-
     mem_alloc = ' '
     mem_alloc = input("Enter memory allocation method (F for first fit, B for best fit or N for next fit): ")
     mem_alloc = mem_alloc.upper()
@@ -395,9 +393,34 @@ def main():
         mem_alloc = 'best_fit'
     elif mem_alloc == 'N':
         mem_alloc = 'next_fit'
-        
-    simulator = Simulator(x, s, u, n, mem_alloc, context_switch)
+   
+    return x, s, u, n,mem_alloc, context_switch
+
+def get_simulator_cmd(simulator):
+    cmd = input("Enter Simulator command: ")
+    match cmd:
+        case "show jobs":
+            simulator.show_jobs()
+            get_simulator_cmd(simulator)
+        case "tick n":
+            cmd.split()
+            n = int(cmd[1]) #run tick for n times IMPLEMENT THAT
+            simulator.run()
+        case "stop":
+            pass
+        case "show queues":
+            pass
+        case "show memory":
+            pass
+        case "admit":
+            pass
+        case "inerrupt":
+            pass
+
+def main():
+    x, s, u, n,mem_alloc, context_switch = get_setup_input()
     
+    simulator = Simulator(x, s, u, n, mem_alloc, context_switch)
     # Create and add processes (pid, instructions, memory_required)
     simulator.add_process(1, ["INPUT", "COMPUTE", "COMPUTE"], 64)
     simulator.add_process(2, ["INPUT", "COMPUTE", "OUTPUT", "COMPUTE"], 128)
@@ -406,9 +429,9 @@ def main():
     simulator.add_process(5, ["COMPUTE", "COMPUTE", "COMPUTE"], 128)
     simulator.add_process(6, ["COMPUTE", "COMPUTE", "COMPUTE"], 64)
     simulator.add_process(7, ["COMPUTE", "COMPUTE", "COMPUTE"], 128)
-    
-    # Run the simulation
-    simulator.run()
+
+    get_simulator_cmd(simulator)
+
 
 if __name__ == "__main__":
     main()
