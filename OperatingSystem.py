@@ -1,3 +1,5 @@
+from collections import deque
+
 cpu_ticks = 0
 
 def cputicks(num = 1):
@@ -74,24 +76,86 @@ class MemoryManager:
             print(f"Process {process.pid} failed to allocate memory. Maximum number of processes reached.")
             return False
 
+        size = process.memory_required    
+        if self.allocation_strategy == 'first_fit':
+            return self.first_fit(size, process)
+        elif self.allocation_strategy == 'best_fit':
+            return self.best_fit(size, process)
+        elif self.allocation_strategy == 'next_fit':
+            return self.next_fit(size, process)
         else:
-            size = process.memory_required    
-            if self.allocation_strategy == 'first_fit':
-                for i, (start, block_size) in enumerate(self.free_blocks):
-                    if size <= block_size:
-                        
-                        self.allocated_memory[process.pid] = (start, size)
-                        #print(f"Process {process.pid} allocated {size} units of memory and starts at {start}.")
-                        #print(self.allocated_memory)
-                        if size == block_size:
-                            self.free_blocks.pop(i)
-                        else:
-                            self.free_blocks[i] = (start + size, block_size - size)
-                        #print(f"Process {process.pid} allocated {size} units of memory.")
-                        return True
-                print(f"Process {process.pid} failed to allocate {size} units of memory.")
-                return False
-            
+            print("Unknown allocation strategy.")
+            return False
+    def first_fit(self, size, process):
+        for i, (start, block_size) in enumerate(self.free_blocks):
+            if size <= block_size:
+                
+                self.allocated_memory[process.pid] = (start, size)
+                #print(f"Process {process.pid} allocated {size} units of memory and starts at {start}.")
+                #print(self.allocated_memory)
+                if size == block_size:
+                    self.free_blocks.pop(i)
+                else:
+                    self.free_blocks[i] = (start + size, block_size - size)
+                print(f"Process {process.pid} allocated {size} units of memory at {start} using first_fit.")
+                return True
+        print(f"Process {process.pid} failed to allocate {size} units of memory.")
+        return False
+
+    def best_fit(self, size, process):
+        """Implements best-fit allocation strategy."""
+        best_block_index = None
+        best_block_size = float('inf')
+        
+        for i, (start, block_size) in enumerate(self.free_blocks):
+            if size <= block_size < best_block_size:
+                best_block_index = i
+                best_block_size = block_size
+
+        if best_block_index is not None:
+            start, block_size = self.free_blocks[best_block_index]
+            self.allocated_memory[process.pid] = (start, size)
+            if size == block_size:
+                self.free_blocks.pop(best_block_index)
+            else:
+                self.free_blocks[best_block_index] = (start + size, block_size - size)
+            print(f"Process {process.pid} allocated {size} units of memory at {start} using best_fit.")
+            return True
+        print(f"Process {process.pid} failed to allocate {size} units of memory.")
+        return False
+
+    def next_fit(self, size, process):
+        """Implements next-fit allocation strategy."""
+        start_search_index = next((i for i, (start, block_size) in enumerate(self.free_blocks) 
+                                   if start >= self.allocation_pointer), 0)
+        
+        for i in range(start_search_index, len(self.free_blocks)):
+            start, block_size = self.free_blocks[i]
+            if size <= block_size:
+                self.allocated_memory[process.pid] = (start, size)
+                self.allocation_pointer = start + size  # Update allocation pointer for next allocation
+                if size == block_size:
+                    self.free_blocks.pop(i)
+                else:
+                    self.free_blocks[i] = (start + size, block_size - size)
+                print(f"Process {process.pid} allocated {size} units of memory at {start} using next_fit.")
+                return True
+
+        for i in range(0, start_search_index):  # Wrap around search if needed
+            start, block_size = self.free_blocks[i]
+            if size <= block_size:
+                self.allocated_memory[process.pid] = (start, size)
+                self.allocation_pointer = start + size
+                if size == block_size:
+                    self.free_blocks.pop(i)
+                else:
+                    self.free_blocks[i] = (start + size, block_size - size)
+                print(f"Process {process.pid} allocated {size} units of memory at {start} using next_fit.")
+                return True
+
+        print(f"Process {process.pid} failed to allocate {size} units of memory.")
+        return False 
+
     def release_memory(self, process):
         """Releases memory for a terminated process."""
         if process.pid in self.allocated_memory:
